@@ -230,6 +230,79 @@ function rebuildTower() {
   }
 }
 
+function exportObj() {
+  if (!towerMesh) return;
+  towerMesh.updateMatrixWorld(true);
+
+  const geometry = towerMesh.geometry.clone();
+  geometry.applyMatrix4(towerMesh.matrixWorld);
+
+  const position = geometry.getAttribute("position");
+  const color = geometry.getAttribute("color");
+  const normal = geometry.getAttribute("normal");
+  const index = geometry.index;
+
+  let obj = "o TwistedTower\n";
+
+  for (let i = 0; i < position.count; i += 1) {
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const z = position.getZ(i);
+    if (color) {
+      const r = color.getX(i);
+      const g = color.getY(i);
+      const b = color.getZ(i);
+      obj += `v ${x} ${y} ${z} ${r} ${g} ${b}\n`;
+    } else {
+      obj += `v ${x} ${y} ${z}\n`;
+    }
+  }
+
+  if (normal) {
+    for (let i = 0; i < normal.count; i += 1) {
+      const x = normal.getX(i);
+      const y = normal.getY(i);
+      const z = normal.getZ(i);
+      obj += `vn ${x} ${y} ${z}\n`;
+    }
+  }
+
+  const faceLine = (a, b, c) => {
+    if (normal) {
+      const na = a + 1;
+      const nb = b + 1;
+      const nc = c + 1;
+      return `f ${a + 1}//${na} ${b + 1}//${nb} ${c + 1}//${nc}\n`;
+    }
+    return `f ${a + 1} ${b + 1} ${c + 1}\n`;
+  };
+
+  if (index) {
+    for (let i = 0; i < index.count; i += 3) {
+      const a = index.getX(i);
+      const b = index.getX(i + 1);
+      const c = index.getX(i + 2);
+      obj += faceLine(a, b, c);
+    }
+  } else {
+    for (let i = 0; i < position.count; i += 3) {
+      obj += faceLine(i, i + 1, i + 2);
+    }
+  }
+
+  geometry.dispose();
+
+  const blob = new Blob([obj], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "twisted-tower.obj";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 rebuildTower();
 
 const gui = new GUI({ width: 280, title: "Twisted Tower" });
@@ -272,6 +345,9 @@ scaleFolder.add(params, "scaleCurve", Object.keys(curveFns)).name("Curve").onCha
 const colorFolder = gui.addFolder("Color Gradient");
 colorFolder.addColor(params, "bottomColor").name("Bottom").onChange(rebuildTower);
 colorFolder.addColor(params, "topColor").name("Top").onChange(rebuildTower);
+
+const exportFolder = gui.addFolder("Export");
+exportFolder.add({ obj: exportObj }, "obj").name("OBJ");
 
 const uiPanel = document.createElement("div");
 uiPanel.className = "ui-panel";
