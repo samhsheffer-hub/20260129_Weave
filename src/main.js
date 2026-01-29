@@ -25,7 +25,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
-const container = document.querySelector('#app') || document.body;
+const container = document.querySelector("#app") || document.body;
 container.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -41,13 +41,26 @@ let weaveMaterial = null;
 const params = {
   threadCountU: 12,
   threadCountV: 12,
-  threadRadius: 0.12,
+  radiusStart: 0.1,
+  radiusMid: 0.12,
+  radiusEnd: 0.1,
+  profileCurve: "ease",
   spacing: 0.6,
   weaveHeight: 0.28,
+  heightLevels: 3,
+  contactOffset: 0.06,
+  contactSmoothness: 0.2,
+  collisionPadding: 0,
+  stiffness: 0.7,
+  bendResistance: 0.6,
+  relaxIterations: 18,
   twistAmount: 120,
-  twistMode: "startToEnd",
-  scaleTaper: 0.35,
-  scaleMode: "symmetrical",
+  twistProfile: "ease",
+  twistNoise: 6,
+  twistCustom0: 0,
+  twistCustom1: 0.5,
+  twistCustom2: 0.5,
+  twistCustom3: 0,
   weaveAngle: 15,
   resolution: 60,
   colorMode: "twoColor",
@@ -73,6 +86,10 @@ function rebuildWeave() {
     strands.map((strand) => strand.geometry),
     false
   );
+  if (!merged) {
+    console.error("Merge failed - check geometry attributes");
+    return;
+  }
   merged.computeVertexNormals();
 
   if (!weaveMaterial) {
@@ -100,20 +117,46 @@ const gui = new GUI({ title: "Weave Controls" });
 const weaveFolder = gui.addFolder("Threads");
 weaveFolder.add(params, "threadCountU", 2, 40, 1).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "threadCountV", 2, 40, 1).onFinishChange(rebuildWeave);
-weaveFolder.add(params, "threadRadius", 0.04, 0.4, 0.01).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "spacing", 0.25, 1.5, 0.01).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "weaveHeight", 0, 0.8, 0.01).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "resolution", 12, 140, 1).onFinishChange(rebuildWeave);
 
-const twistFolder = gui.addFolder("Twist + Taper");
+const profileFolder = gui.addFolder("Thickness");
+profileFolder.add(params, "radiusStart", 0.02, 0.4, 0.01).onFinishChange(rebuildWeave);
+profileFolder.add(params, "radiusMid", 0.02, 0.5, 0.01).onFinishChange(rebuildWeave);
+profileFolder.add(params, "radiusEnd", 0.02, 0.4, 0.01).onFinishChange(rebuildWeave);
+profileFolder
+  .add(params, "profileCurve", ["linear", "ease", "sharp"])
+  .onFinishChange(rebuildWeave);
+
+const crossingFolder = gui.addFolder("Crossings");
+crossingFolder.add(params, "heightLevels", 2, 6, 1).onFinishChange(rebuildWeave);
+crossingFolder.add(params, "contactOffset", 0, 0.3, 0.01).onFinishChange(rebuildWeave);
+crossingFolder
+  .add(params, "contactSmoothness", 0.05, 0.6, 0.01)
+  .onFinishChange(rebuildWeave);
+crossingFolder
+  .add(params, "collisionPadding", 0, 0.3, 0.01)
+  .onFinishChange(rebuildWeave);
+
+const relaxFolder = gui.addFolder("Relaxation");
+relaxFolder.add(params, "stiffness", 0, 1, 0.01).onFinishChange(rebuildWeave);
+relaxFolder
+  .add(params, "bendResistance", 0, 1, 0.01)
+  .onFinishChange(rebuildWeave);
+relaxFolder.add(params, "relaxIterations", 0, 60, 1).onFinishChange(rebuildWeave);
+
+const twistFolder = gui.addFolder("Twist");
 twistFolder.add(params, "twistAmount", -360, 360, 1).onFinishChange(rebuildWeave);
 twistFolder
-  .add(params, "twistMode", ["startToEnd", "symmetrical"])
+  .add(params, "twistProfile", ["linear", "ease", "symmetric", "custom"])
   .onFinishChange(rebuildWeave);
-twistFolder.add(params, "scaleTaper", 0, 0.9, 0.01).onFinishChange(rebuildWeave);
-twistFolder
-  .add(params, "scaleMode", ["symmetrical", "startToEnd"])
-  .onFinishChange(rebuildWeave);
+twistFolder.add(params, "twistNoise", 0, 20, 0.5).onFinishChange(rebuildWeave);
+const customTwistFolder = twistFolder.addFolder("Custom Graph");
+customTwistFolder.add(params, "twistCustom0", 0, 1, 0.01).onFinishChange(rebuildWeave);
+customTwistFolder.add(params, "twistCustom1", 0, 1, 0.01).onFinishChange(rebuildWeave);
+customTwistFolder.add(params, "twistCustom2", 0, 1, 0.01).onFinishChange(rebuildWeave);
+customTwistFolder.add(params, "twistCustom3", 0, 1, 0.01).onFinishChange(rebuildWeave);
 
 const layoutFolder = gui.addFolder("Layout");
 layoutFolder.add(params, "weaveAngle", -180, 180, 1).onFinishChange(rebuildWeave);
@@ -153,4 +196,3 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
