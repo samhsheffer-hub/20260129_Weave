@@ -1,12 +1,12 @@
-# 260128_Twisted-Tower_02
+# 260128_Textures
 
-Parametric twisted tower generator that stacks floor slabs with adjustable twist, scale, height, and gradient color controls for rapid massing exploration in the browser.
+Procedural interlocking puzzle tiles rendered in Three.js with parametric controls for edge waviness, tabs, grout gaps, grid size, twist/scale gradients, height, and colors.
 
 ## Features
-- Stacked floor-slab tower built from instanced geometry for performance.
-- Parametric controls for floor count, total height, slab size, and slab thickness.
-- Twist and scale gradients with min/max ranges and curve types.
-- Bottom-to-top color gradient controls.
+- Rounded-square tiles with wavy concave/convex edges that interlock across a grid.
+- Gradient min/max controls for twist and scale across the tile field.
+- Tile and grout color pickers with adjustable grout gap and tile height.
+- Seeded randomness for repeatable variations.
 
 ## Getting Started
 1. Install dependencies: `npm install`
@@ -14,6 +14,7 @@ Parametric twisted tower generator that stacks floor slabs with adjustable twist
 3. Open the local URL shown in the terminal.
 
 ## Controls
-- **Orbit:** left-drag
-- **Zoom:** scroll
-- **Sliders:** adjust tower parameters, twist/scale gradients, and colors
+- **Rows/Cols:** set grid size.
+- **Wave/Tab:** tune edge waviness and tab shape.
+- **Twist/Scale:** set min/max gradients across the grid.
+- **Height/Grout/Colors:** adjust tile thickness, spacing, and palette.

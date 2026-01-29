@@ -1,8 +1,6 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import GUI from "lil-gui";
+import noUiSlider from "nouislider";
+import "nouislider/dist/nouislider.css";
 import "./style.css";
 
 const app = document.querySelector("#app");
@@ -10,502 +8,683 @@ const app = document.querySelector("#app");
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x0f1418, 1);
+renderer.setClearColor(0xffffff, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
 
-const camera = new THREE.PerspectiveCamera(
-  45,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  200
-);
-camera.position.set(10, 10, 14);
+const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10);
+camera.position.set(0, 0, 4);
+camera.lookAt(0, 0, 0);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-
-const ambient = new THREE.AmbientLight(0xffffff, 0.55);
-scene.add(ambient);
-
-const hemiLight = new THREE.HemisphereLight(0x9ec5ff, 0x202026, 0.9);
-scene.add(hemiLight);
-
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.3);
-keyLight.position.set(10, 16, 8);
-scene.add(keyLight);
-
-const fillLight = new THREE.DirectionalLight(0xffe7c4, 0.6);
-fillLight.position.set(-12, 6, 4);
-scene.add(fillLight);
-
-const rimLight = new THREE.DirectionalLight(0xffffff, 0.7);
-rimLight.position.set(0, 8, -12);
-scene.add(rimLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+dirLight.position.set(1.5, 2, 3);
+scene.add(dirLight);
 
 const params = {
-  backgroundColor: "#0f1418",
-  floorCount: 40,
-  floorHeight: 0.25,
-  towerHeight: 20,
-  slabSize: 4,
-  slabDepth: 0.5,
-  slabShape: "rock",
-  segments: 32,
-  polygonSides: 6,
-  polygonIrregularity: 0.2,
-  starPoints: 5,
-  starInnerRadius: 0.25,
-  roundRadius: 0.08,
-  roundSegments: 4,
-  cylinderSegments: 32,
-  circleSegments: 48,
-  rockSeed: 1201,
-  rockNoise: 0.28,
-  rockFrequency: 1.6,
-  rockTopBottom: 0.25,
-  rockEdgeRound: 0.55,
-  rockChip: 0.08,
-  rockOffset: 0.35,
-  rockTilt: 6,
-  twistMin: 0,
-  twistMax: 180,
-  scaleMin: 1,
-  scaleMax: 0.5,
-  twistCurve: "linear",
-  scaleCurve: "easeInOut",
-  bottomColor: "#f2a365",
-  topColor: "#4dd0e1",
+  rows: 4,
+  cols: 4,
+  size: 1.0,
+  cornerRadius: 0.12,
+  waveAmp: 0.06,
+  waveFreq: 2.6,
+  tabDepth: 0.1,
+  tabWidth: 0.35,
+  groutGap: 0.03,
+  seed: 7,
+  depth: 0.08,
+  twistMin: -8,
+  twistMax: 8,
+  scaleMin: 0.92,
+  scaleMax: 1.05,
+  tileColor: "#d8d8d8",
+  groutColor: "#ffffff",
 };
 
-const curveFns = {
-  linear: (t) => t,
-  easeIn: (t) => t * t,
-  easeOut: (t) => 1 - (1 - t) * (1 - t),
-  easeInOut: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-};
-
-function fract(value) {
-  return value - Math.floor(value);
-}
-
-function hash3(x, y, z, seed) {
-  const n = x * 12.9898 + y * 78.233 + z * 37.719 + seed * 0.1234;
-  return fract(Math.sin(n) * 43758.5453);
-}
-
-function noise3(x, y, z, seed) {
-  const ix = Math.floor(x);
-  const iy = Math.floor(y);
-  const iz = Math.floor(z);
-  const fx = x - ix;
-  const fy = y - iy;
-  const fz = z - iz;
-
-  const n000 = hash3(ix, iy, iz, seed);
-  const n100 = hash3(ix + 1, iy, iz, seed);
-  const n010 = hash3(ix, iy + 1, iz, seed);
-  const n110 = hash3(ix + 1, iy + 1, iz, seed);
-  const n001 = hash3(ix, iy, iz + 1, seed);
-  const n101 = hash3(ix + 1, iy, iz + 1, seed);
-  const n011 = hash3(ix, iy + 1, iz + 1, seed);
-  const n111 = hash3(ix + 1, iy + 1, iz + 1, seed);
-
-  const wx = fx * fx * (3 - 2 * fx);
-  const wy = fy * fy * (3 - 2 * fy);
-  const wz = fz * fz * (3 - 2 * fz);
-
-  const x00 = n000 * (1 - wx) + n100 * wx;
-  const x10 = n010 * (1 - wx) + n110 * wx;
-  const x01 = n001 * (1 - wx) + n101 * wx;
-  const x11 = n011 * (1 - wx) + n111 * wx;
-  const y0 = x00 * (1 - wy) + x10 * wy;
-  const y1 = x01 * (1 - wy) + x11 * wy;
-  return y0 * (1 - wz) + y1 * wz;
-}
-
-function makeRng(seed) {
-  let state = seed >>> 0;
-  return () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 4294967295;
-  };
-}
-
-let slabGeometry = null;
-const slabMaterial = new THREE.MeshStandardMaterial({
-  metalness: 0.1,
-  roughness: 0.5,
-  vertexColors: true,
-  color: 0xffffff,
+const tileMaterial = new THREE.MeshStandardMaterial({
+  color: new THREE.Color(params.tileColor),
+  roughness: 0.9,
+  metalness: 0.0,
+  side: THREE.DoubleSide,
 });
 
-let towerMesh = null;
-
-function createSlabGeometry(seedOverride) {
-  if (params.slabShape === "rock") {
-    const segments = 8;
-    const geometry = new THREE.BoxGeometry(1, 1, 1, segments, segments, segments);
-    geometry.computeVertexNormals();
-
-    const position = geometry.attributes.position;
-    const normal = geometry.attributes.normal;
-    const noiseAmp = params.rockNoise;
-    const freq = Math.max(0.1, params.rockFrequency);
-    const topBottom = params.rockTopBottom;
-    const edgeRound = params.rockEdgeRound;
-    const chip = params.rockChip;
-    const seed = seedOverride ?? params.rockSeed;
-
-    for (let i = 0; i < position.count; i += 1) {
-      let x = position.getX(i);
-      let y = position.getY(i);
-      let z = position.getZ(i);
-
-      const n = noise3(x * freq, y * freq, z * freq, seed);
-      const d = (n - 0.5) * 2 * noiseAmp;
-
-      const edge = Math.max(Math.abs(x), Math.abs(z));
-      const round = edgeRound * Math.pow(edge, 2);
-      x *= 1 - round;
-      z *= 1 - round;
-
-      const r = Math.sqrt(x * x + y * y + z * z);
-      const target = 0.55;
-      const s = r > 0 ? target / r : 1;
-      const blob = edgeRound * 0.7;
-      x = THREE.MathUtils.lerp(x, x * s, blob);
-      y = THREE.MathUtils.lerp(y, y * s, blob);
-      z = THREE.MathUtils.lerp(z, z * s, blob);
-
-      const chipMask = Math.max(0, edge - 0.35);
-      const chipAmt = chip * chipMask * (n - 0.5);
-      x += chipAmt * (x >= 0 ? 1 : -1);
-      z += chipAmt * (z >= 0 ? 1 : -1);
-
-      const topMask = Math.max(0, y);
-      const bottomMask = Math.max(0, -y);
-      y += (topMask - bottomMask) * topBottom * (n - 0.5);
-
-      const nx = normal.getX(i);
-      const ny = normal.getY(i);
-      const nz = normal.getZ(i);
-      x += nx * d;
-      y += ny * d;
-      z += nz * d;
-
-      position.setXYZ(i, x, y, z);
-    }
-    geometry.computeVertexNormals();
-    return geometry;
-  }
-  if (params.slabShape === "cylinder") {
-    const segments = Math.max(6, Math.floor(params.segments));
-    return new THREE.CylinderGeometry(0.5, 0.5, 1, segments, 1);
-  }
-  if (params.slabShape === "circle") {
-    const segments = Math.max(8, Math.floor(params.segments));
-    return new THREE.CylinderGeometry(0.5, 0.5, 1, segments, 1);
-  }
-  if (params.slabShape === "polygon") {
-    const sides = Math.max(3, Math.floor(params.segments));
-    const irregularity = THREE.MathUtils.clamp(params.polygonIrregularity, 0, 0.6);
-    const shape = new THREE.Shape();
-    for (let i = 0; i <= sides; i += 1) {
-      const t = i / sides;
-      const angle = t * Math.PI * 2;
-      const jitter = irregularity === 0 ? 1 : 1 - irregularity + Math.random() * irregularity * 2;
-      const radius = 0.5 * jitter;
-      const x = Math.cos(angle) * radius;
-      const y = Math.sin(angle) * radius;
-      if (i === 0) {
-        shape.moveTo(x, y);
-      } else {
-        shape.lineTo(x, y);
-      }
-    }
-    const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: 1,
-      bevelEnabled: false,
-      steps: 1,
-    });
-    geometry.center();
-    return geometry;
-  }
-  if (params.slabShape === "star") {
-    const points = Math.max(3, Math.floor(params.starPoints));
-    const inner = THREE.MathUtils.clamp(params.starInnerRadius, 0.05, 0.49);
-    const shape = new THREE.Shape();
-    const total = points * 2;
-    for (let i = 0; i <= total; i += 1) {
-      const t = i / total;
-      const angle = t * Math.PI * 2;
-      const radius = i % 2 === 0 ? 0.5 : inner;
-      const x = Math.cos(angle) * radius;
-      const y = Math.sin(angle) * radius;
-      if (i === 0) {
-        shape.moveTo(x, y);
-      } else {
-        shape.lineTo(x, y);
-      }
-    }
-    const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: 1,
-      bevelEnabled: false,
-      steps: 1,
-    });
-    geometry.rotateX(Math.PI / 2);
-    geometry.center();
-    return geometry;
-  }
-  if (params.slabShape === "rounded") {
-    const radius = Math.min(0.45, Math.max(0, params.roundRadius));
-    const segments = Math.max(1, Math.floor(params.roundSegments));
-    return new RoundedBoxGeometry(1, 1, 1, segments, radius);
-  }
-  return new THREE.BoxGeometry(1, 1, 1);
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
-function updateSlabGeometry() {
-  if (params.slabShape === "rock") {
-    if (slabGeometry) {
-      slabGeometry.dispose();
-      slabGeometry = null;
-    }
-    return;
-  }
-  const newGeometry = createSlabGeometry();
-  if (slabGeometry) {
-    slabGeometry.dispose();
-  }
-  slabGeometry = newGeometry;
+function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
 
-const tempObj = new THREE.Object3D();
-const colorBottom = new THREE.Color();
-const colorTop = new THREE.Color();
-
-function rebuildTower() {
-  const count = Math.max(1, Math.floor(params.floorCount));
-  updateSlabGeometry();
-
-  const height = Math.max(1, params.towerHeight);
-  const spacing = height / count;
-  const slabY = -height / 2;
-  const twistCurveFn = curveFns[params.twistCurve] || curveFns.linear;
-  const scaleCurveFn = curveFns[params.scaleCurve] || curveFns.linear;
-  const isRock = params.slabShape === "rock";
-
-  colorBottom.set(params.bottomColor);
-  colorTop.set(params.topColor);
-
-  const geometries = [];
-
-  for (let i = 0; i < count; i += 1) {
-    const t = count === 1 ? 0 : i / (count - 1);
-    const twistT = twistCurveFn(t);
-    const scaleT = scaleCurveFn(t);
-    const twist = THREE.MathUtils.degToRad(
-      THREE.MathUtils.lerp(params.twistMin, params.twistMax, twistT)
-    );
-    const scale = THREE.MathUtils.lerp(params.scaleMin, params.scaleMax, scaleT);
-
-    tempObj.position.set(0, slabY + i * spacing, 0);
-    tempObj.rotation.set(0, twist, 0);
-    tempObj.scale.set(params.slabSize * scale, params.floorHeight, params.slabDepth * scale);
-    if (isRock) {
-      const rng = makeRng(params.rockSeed + i * 101);
-      const offset = params.rockOffset;
-      const tilt = THREE.MathUtils.degToRad(params.rockTilt);
-      tempObj.position.x += (rng() - 0.5) * 2 * offset;
-      tempObj.position.z += (rng() - 0.5) * 2 * offset;
-      tempObj.rotation.x += (rng() - 0.5) * 2 * tilt;
-      tempObj.rotation.z += (rng() - 0.5) * 2 * tilt;
-    }
-    tempObj.updateMatrix();
-
-    const slab = isRock
-      ? createSlabGeometry(params.rockSeed + i * 17)
-      : slabGeometry.clone();
-    slab.applyMatrix4(tempObj.matrix);
-
-    const position = slab.attributes.position;
-    const colors = new Float32Array(position.count * 3);
-    for (let v = 0; v < position.count; v += 1) {
-      const y = position.getY(v);
-      const ty = THREE.MathUtils.clamp((y - slabY) / height, 0, 1);
-      const color = colorBottom.clone().lerp(colorTop, ty);
-      colors[v * 3] = color.r;
-      colors[v * 3 + 1] = color.g;
-      colors[v * 3 + 2] = color.b;
-    }
-    slab.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    geometries.push(slab);
+function hashSeed(seed) {
+  if (typeof seed === "number" && Number.isFinite(seed)) return Math.floor(seed);
+  const str = String(seed ?? "");
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i += 1) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
   }
-
-  const merged = BufferGeometryUtils.mergeGeometries(geometries, false);
-  merged.computeVertexNormals();
-  geometries.forEach((geom) => geom.dispose());
-
-  if (!towerMesh) {
-    towerMesh = new THREE.Mesh(merged, slabMaterial);
-    scene.add(towerMesh);
-  } else {
-    towerMesh.geometry.dispose();
-    towerMesh.geometry = merged;
-  }
+  return h >>> 0;
 }
 
-function exportObj() {
-  if (!towerMesh) return;
-  towerMesh.updateMatrixWorld(true);
-
-  const geometry = towerMesh.geometry.clone();
-  geometry.applyMatrix4(towerMesh.matrixWorld);
-
-  const position = geometry.getAttribute("position");
-  const color = geometry.getAttribute("color");
-  const normal = geometry.getAttribute("normal");
-  const index = geometry.index;
-
-  let obj = "o TwistedTower\n";
-
-  for (let i = 0; i < position.count; i += 1) {
-    const x = position.getX(i);
-    const y = position.getY(i);
-    const z = position.getZ(i);
-    if (color) {
-      const r = color.getX(i);
-      const g = color.getY(i);
-      const b = color.getZ(i);
-      obj += `v ${x} ${y} ${z} ${r} ${g} ${b}\n`;
-    } else {
-      obj += `v ${x} ${y} ${z}\n`;
-    }
-  }
-
-  if (normal) {
-    for (let i = 0; i < normal.count; i += 1) {
-      const x = normal.getX(i);
-      const y = normal.getY(i);
-      const z = normal.getZ(i);
-      obj += `vn ${x} ${y} ${z}\n`;
-    }
-  }
-
-  const faceLine = (a, b, c) => {
-    if (normal) {
-      const na = a + 1;
-      const nb = b + 1;
-      const nc = c + 1;
-      return `f ${a + 1}//${na} ${b + 1}//${nb} ${c + 1}//${nc}\n`;
-    }
-    return `f ${a + 1} ${b + 1} ${c + 1}\n`;
+function mulberry32(seed) {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), t | 1);
+    r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
+}
 
-  if (index) {
-    for (let i = 0; i < index.count; i += 3) {
-      const a = index.getX(i);
-      const b = index.getX(i + 1);
-      const c = index.getX(i + 2);
-      obj += faceLine(a, b, c);
+function createEdgeProfile({ length, waveAmp, waveFreq, tabDepth, tabWidth, seed, polarity }) {
+  const rng = mulberry32(hashSeed(seed));
+  const phase = rng() * Math.PI * 2;
+  const noisePhaseA = rng() * Math.PI * 2;
+  const noisePhaseB = rng() * Math.PI * 2;
+  const noiseFreqA = 0.8 + rng() * 1.6;
+  const noiseFreqB = 1.4 + rng() * 2.2;
+  const count = Math.max(10, Math.round(waveFreq * 8));
+  const points = [];
+
+  const start = 0.5 - tabWidth * 0.5;
+  const end = 0.5 + tabWidth * 0.5;
+
+  for (let i = 0; i <= count; i += 1) {
+    const t = i / count;
+    const envelope = Math.pow(Math.sin(Math.PI * t), 2);
+    const wave = waveAmp * Math.sin(2 * Math.PI * waveFreq * t + phase) * envelope;
+
+    let tab = 0;
+    if (polarity !== 0 && tabWidth > 0) {
+      const local = clamp((t - start) / (end - start), 0, 1);
+      tab = polarity * tabDepth * Math.pow(Math.sin(Math.PI * local), 2);
     }
-  } else {
-    for (let i = 0; i < position.count; i += 3) {
-      obj += faceLine(i, i + 1, i + 2);
-    }
+
+    const noise =
+      waveAmp *
+      0.12 *
+      envelope *
+      (Math.sin(2 * Math.PI * noiseFreqA * t + noisePhaseA) * 0.6 +
+        Math.sin(2 * Math.PI * noiseFreqB * t + noisePhaseB) * 0.3);
+
+    const offset = wave + tab + noise;
+    points.push(new THREE.Vector2(t * length, offset));
   }
 
-  geometry.dispose();
-
-  const blob = new Blob([obj], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "twisted-tower.obj";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  return { length, points, polarity };
 }
 
-rebuildTower();
+function mirrorProfile(profile) {
+  const reversed = profile.points
+    .slice()
+    .reverse()
+    .map((point) => new THREE.Vector2(profile.length - point.x, -point.y));
+  return { length: profile.length, points: reversed, polarity: -profile.polarity };
+}
 
-const gui = new GUI({ width: 280, title: "Twisted Tower" });
-gui.addColor(params, "backgroundColor")
-  .name("Background")
-  .onChange((value) => {
-    renderer.setClearColor(value, 1);
-    scene.background = new THREE.Color(value);
+function mapEdgePoint(point, side, size, cornerRadius) {
+  const half = size * 0.5;
+  const edgeLen = size - cornerRadius * 2;
+  const u = point.x;
+  const v = point.y;
+
+  switch (side) {
+    case "top":
+      return new THREE.Vector2(-edgeLen * 0.5 + u, half + v);
+    case "right":
+      return new THREE.Vector2(half + v, edgeLen * 0.5 - u);
+    case "bottom":
+      return new THREE.Vector2(edgeLen * 0.5 - u, -half + v);
+    case "left":
+      return new THREE.Vector2(-half + v, -edgeLen * 0.5 + u);
+    default:
+      return new THREE.Vector2();
+  }
+}
+
+function arcPoints(cx, cy, radius, startAngle, endAngle, segments) {
+  const points = [];
+  for (let i = 1; i <= segments; i += 1) {
+    const t = i / segments;
+    const angle = startAngle + (endAngle - startAngle) * t;
+    points.push(new THREE.Vector2(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius));
+  }
+  return points;
+}
+
+function edgeCurvePoints(profile, side, size, cornerRadius, samples = 48) {
+  const curve = new THREE.CatmullRomCurve2(profile.points, false, "centripetal");
+  return curve.getPoints(samples).map((p) => mapEdgePoint(p, side, size, cornerRadius));
+}
+
+function resolveEdgeProfile(edge, length, params, seedOffset) {
+  if (edge && edge.points) return edge;
+  const polarity = Number(edge || 0);
+  return createEdgeProfile({
+    length,
+    waveAmp: params.waveAmp,
+    waveFreq: params.waveFreq,
+    tabDepth: params.tabDepth,
+    tabWidth: params.tabWidth,
+    seed: hashSeed(params.seed) + seedOffset,
+    polarity,
   });
-gui.add(params, "floorCount", 1, 120, 1).name("Floors").onChange(rebuildTower);
-gui.add(params, "towerHeight", 5, 80, 0.5).name("Total Height").onChange(rebuildTower);
-gui.add(params, "floorHeight", 0.1, 1, 0.05).name("Slab Height").onChange(rebuildTower);
-gui.add(params, "slabSize", 1, 8, 0.1).name("Slab Width").onChange(rebuildTower);
-gui.add(params, "slabDepth", 0.2, 6, 0.1).name("Slab Depth").onChange(rebuildTower);
-gui.add(params, "slabShape", ["rock", "box", "rounded", "circle", "cylinder", "polygon", "star"])
-  .name("Slab Shape")
-  .onChange(rebuildTower);
-gui.add(params, "segments", 3, 96, 1).name("Segments").onChange(rebuildTower);
-gui.add(params, "polygonSides", 3, 12, 1).name("Polygon Sides").onChange(rebuildTower);
-gui.add(params, "polygonIrregularity", 0, 0.6, 0.01)
-  .name("Irregularity")
-  .onChange(rebuildTower);
-gui.add(params, "starPoints", 3, 12, 1).name("Star Points").onChange(rebuildTower);
-gui.add(params, "starInnerRadius", 0.05, 0.49, 0.01).name("Star Inner").onChange(rebuildTower);
-
-const rockFolder = gui.addFolder("Rock Blocks");
-rockFolder.add(params, "rockSeed", 1, 9999, 1).name("Seed").onChange(rebuildTower);
-rockFolder.add(params, "rockNoise", 0, 0.6, 0.01).name("Noise").onChange(rebuildTower);
-rockFolder.add(params, "rockFrequency", 0.5, 6, 0.1).name("Frequency").onChange(rebuildTower);
-rockFolder.add(params, "rockTopBottom", 0, 0.8, 0.01).name("Top/Bottom").onChange(rebuildTower);
-rockFolder.add(params, "rockEdgeRound", 0, 0.8, 0.01).name("Edge Round").onChange(rebuildTower);
-rockFolder.add(params, "rockChip", 0, 0.6, 0.01).name("Chipping").onChange(rebuildTower);
-rockFolder.add(params, "rockOffset", 0, 1.5, 0.01).name("Offset").onChange(rebuildTower);
-rockFolder.add(params, "rockTilt", 0, 20, 0.1).name("Tilt (deg)").onChange(rebuildTower);
-gui.add(params, "roundRadius", 0, 0.45, 0.01).name("Round Radius").onChange(rebuildTower);
-gui.add(params, "roundSegments", 1, 12, 1).name("Round Segs").onChange(rebuildTower);
-gui.add(params, "cylinderSegments", 6, 64, 1).name("Cylinder Segs").onChange(rebuildTower);
-gui.add(params, "circleSegments", 8, 96, 1).name("Circle Segs").onChange(rebuildTower);
-
-const twistFolder = gui.addFolder("Twist Gradient");
-twistFolder.add(params, "twistMin", -720, 720, 1).name("Min (deg)").onChange(rebuildTower);
-twistFolder.add(params, "twistMax", -720, 720, 1).name("Max (deg)").onChange(rebuildTower);
-twistFolder.add(params, "twistCurve", Object.keys(curveFns)).name("Curve").onChange(rebuildTower);
-
-const scaleFolder = gui.addFolder("Scale Gradient");
-scaleFolder.add(params, "scaleMin", 0.2, 2, 0.01).name("Min").onChange(rebuildTower);
-scaleFolder.add(params, "scaleMax", 0.2, 2, 0.01).name("Max").onChange(rebuildTower);
-scaleFolder.add(params, "scaleCurve", Object.keys(curveFns)).name("Curve").onChange(rebuildTower);
-
-const colorFolder = gui.addFolder("Color Gradient");
-colorFolder.addColor(params, "bottomColor").name("Bottom").onChange(rebuildTower);
-colorFolder.addColor(params, "topColor").name("Top").onChange(rebuildTower);
-
-const exportFolder = gui.addFolder("Export");
-exportFolder.add({ obj: exportObj }, "obj").name("OBJ");
-
-const uiPanel = document.createElement("div");
-uiPanel.className = "ui-panel";
-uiPanel.innerHTML = "<strong>Tip:</strong> drag to orbit, scroll to zoom.";
-app.appendChild(uiPanel);
-
-function onResize() {
-  const { innerWidth, innerHeight } = window;
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
 }
 
-window.addEventListener("resize", onResize);
+export function makeTileShape({
+  size = 1,
+  cornerRadius = 0.12,
+  waveAmp = 0.06,
+  waveFreq = 2.5,
+  tabDepth = 0.1,
+  tabWidth = 0.35,
+  seed = 1,
+  groutGap = 0,
+  edges = { top: 0, right: 0, bottom: 0, left: 0 },
+} = {}) {
+  const localParams = { size, cornerRadius, waveAmp, waveFreq, tabDepth, tabWidth, seed };
+  const edgeLen = size - cornerRadius * 2;
+
+  const topProfile = resolveEdgeProfile(edges.top, edgeLen, localParams, 11);
+  const rightProfile = resolveEdgeProfile(edges.right, edgeLen, localParams, 23);
+  const bottomProfile = resolveEdgeProfile(edges.bottom, edgeLen, localParams, 37);
+  const leftProfile = resolveEdgeProfile(edges.left, edgeLen, localParams, 41);
+
+  const points = [];
+  const half = size * 0.5;
+  const r = cornerRadius;
+
+  points.push(...edgeCurvePoints(topProfile, "top", size, r));
+  points.push(...arcPoints(half - r, half - r, r, Math.PI / 2, 0, 8));
+  points.push(...edgeCurvePoints(rightProfile, "right", size, r));
+  points.push(...arcPoints(half - r, -half + r, r, 0, -Math.PI / 2, 8));
+  points.push(...edgeCurvePoints(bottomProfile, "bottom", size, r));
+  points.push(...arcPoints(-half + r, -half + r, r, -Math.PI / 2, -Math.PI, 8));
+  points.push(...edgeCurvePoints(leftProfile, "left", size, r));
+  points.push(...arcPoints(-half + r, half - r, r, Math.PI, Math.PI / 2, 8));
+
+  if (groutGap > 0) {
+    const scale = (size - groutGap * 2) / size;
+    points.forEach((p) => {
+      p.x *= scale;
+      p.y *= scale;
+    });
+  }
+
+  return new THREE.Shape(points);
+}
+
+export function generateTiledLayout(rows, cols, tileParams = {}) {
+  const layout = [];
+  const baseSeed = hashSeed(tileParams.seed ?? 1);
+
+  for (let r = 0; r < rows; r += 1) {
+    const row = [];
+    for (let c = 0; c < cols; c += 1) {
+      const tileSeed = baseSeed + r * 1000 + c * 97;
+      const rng = mulberry32(tileSeed);
+      const edgeLen = tileParams.size - tileParams.cornerRadius * 2;
+
+      const edges = {};
+
+      if (r === 0) {
+        edges.top = createEdgeProfile({
+          length: edgeLen,
+          waveAmp: tileParams.waveAmp,
+          waveFreq: tileParams.waveFreq,
+          tabDepth: tileParams.tabDepth,
+          tabWidth: tileParams.tabWidth,
+          seed: tileSeed + 1,
+          polarity: 0,
+        });
+      } else {
+        edges.top = mirrorProfile(layout[r - 1][c].edges.bottom);
+      }
+
+      if (c === 0) {
+        edges.left = createEdgeProfile({
+          length: edgeLen,
+          waveAmp: tileParams.waveAmp,
+          waveFreq: tileParams.waveFreq,
+          tabDepth: tileParams.tabDepth,
+          tabWidth: tileParams.tabWidth,
+          seed: tileSeed + 2,
+          polarity: 0,
+        });
+      } else {
+        edges.left = mirrorProfile(row[c - 1].edges.right);
+      }
+
+      if (c === cols - 1) {
+        edges.right = createEdgeProfile({
+          length: edgeLen,
+          waveAmp: tileParams.waveAmp,
+          waveFreq: tileParams.waveFreq,
+          tabDepth: tileParams.tabDepth,
+          tabWidth: tileParams.tabWidth,
+          seed: tileSeed + 3,
+          polarity: 0,
+        });
+      } else {
+        const polarity = rng() > 0.5 ? 1 : -1;
+        edges.right = createEdgeProfile({
+          length: edgeLen,
+          waveAmp: tileParams.waveAmp,
+          waveFreq: tileParams.waveFreq,
+          tabDepth: tileParams.tabDepth,
+          tabWidth: tileParams.tabWidth,
+          seed: tileSeed + 3,
+          polarity,
+        });
+      }
+
+      if (r === rows - 1) {
+        edges.bottom = createEdgeProfile({
+          length: edgeLen,
+          waveAmp: tileParams.waveAmp,
+          waveFreq: tileParams.waveFreq,
+          tabDepth: tileParams.tabDepth,
+          tabWidth: tileParams.tabWidth,
+          seed: tileSeed + 4,
+          polarity: 0,
+        });
+      } else {
+        const polarity = rng() > 0.5 ? 1 : -1;
+        edges.bottom = createEdgeProfile({
+          length: edgeLen,
+          waveAmp: tileParams.waveAmp,
+          waveFreq: tileParams.waveFreq,
+          tabDepth: tileParams.tabDepth,
+          tabWidth: tileParams.tabWidth,
+          seed: tileSeed + 4,
+          polarity,
+        });
+      }
+
+      const shape = makeTileShape({
+        ...tileParams,
+        edges: {
+          top: edges.top,
+          right: edges.right,
+          bottom: edges.bottom,
+          left: edges.left,
+        },
+      });
+
+      row.push({ shape, edges });
+    }
+    layout.push(row);
+  }
+
+  return layout;
+}
+
+let tileGroup = null;
+
+function disposeGroup(group) {
+  group.traverse((child) => {
+    if (child.isMesh && child.geometry) {
+      child.geometry.dispose();
+    }
+  });
+}
+
+function updateGrout() {
+  scene.background = new THREE.Color(params.groutColor);
+  renderer.setClearColor(params.groutColor, 1);
+}
+
+function buildTiles() {
+  if (tileGroup) {
+    scene.remove(tileGroup);
+    disposeGroup(tileGroup);
+  }
+
+  const rows = params.rows;
+  const cols = params.cols;
+  const layout = generateTiledLayout(rows, cols, params);
+  tileGroup = new THREE.Group();
+
+  layout.forEach((row, r) => {
+    row.forEach((tile, c) => {
+      const geometry = new THREE.ExtrudeGeometry(tile.shape, {
+        depth: params.depth,
+        bevelEnabled: false,
+        steps: 1,
+      });
+      geometry.center();
+      const mesh = new THREE.Mesh(geometry, tileMaterial);
+
+      const rowT = rows === 1 ? 0.5 : r / (rows - 1);
+      const colT = cols === 1 ? 0.5 : c / (cols - 1);
+      const gradientT = (rowT + colT) * 0.5;
+
+      const scale = lerp(params.scaleMin, params.scaleMax, gradientT);
+      const twist = lerp(params.twistMin, params.twistMax, gradientT) * (Math.PI / 180);
+
+      mesh.position.x = (c - (cols - 1) / 2) * params.size;
+      mesh.position.y = ((rows - 1) / 2 - r) * params.size;
+      mesh.position.z = -params.depth * 0.5;
+      mesh.rotation.z = twist;
+      mesh.scale.setScalar(scale);
+
+      tileGroup.add(mesh);
+    });
+  });
+
+  scene.add(tileGroup);
+  resize();
+}
+
+function resize() {
+  const { innerWidth, innerHeight } = window;
+  renderer.setSize(innerWidth, innerHeight);
+  const aspect = innerWidth / innerHeight;
+  const span = Math.max(params.cols, params.rows) * params.size * 0.7;
+  camera.left = -span * aspect;
+  camera.right = span * aspect;
+  camera.top = span;
+  camera.bottom = -span;
+  camera.updateProjectionMatrix();
+}
+
+window.addEventListener("resize", resize);
+
+function createControlPanel() {
+  const panel = document.createElement("div");
+  panel.className = "control-panel";
+
+  const title = document.createElement("div");
+  title.className = "control-title";
+  title.textContent = "Tile Controls";
+  panel.appendChild(title);
+
+  const section = document.createElement("div");
+  section.className = "control-section";
+  panel.appendChild(section);
+
+  function addRow(labelText) {
+    const row = document.createElement("div");
+    row.className = "control-row";
+    const label = document.createElement("span");
+    label.className = "control-label";
+    label.textContent = labelText;
+    row.appendChild(label);
+    section.appendChild(row);
+    return row;
+  }
+
+  function addRangeControl({ label, min, max, step, value, onChange, format }) {
+    const row = addRow(label);
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = min;
+    input.max = max;
+    input.step = step;
+    input.value = value;
+    const output = document.createElement("span");
+    output.className = "control-value";
+    const formatValue = format || ((val) => String(val));
+    output.textContent = formatValue(Number(value));
+
+    input.addEventListener("input", () => {
+      const next = Number(input.value);
+      output.textContent = formatValue(next);
+      onChange(next);
+    });
+
+    row.appendChild(input);
+    row.appendChild(output);
+    return input;
+  }
+
+  function addColorControl({ label, value, onChange }) {
+    const row = addRow(label);
+    const input = document.createElement("input");
+    input.type = "color";
+    input.value = value;
+    input.addEventListener("input", () => {
+      onChange(input.value);
+    });
+    row.appendChild(input);
+    return input;
+  }
+
+  function addDualSlider({ label, min, max, step, values, onChange, format }) {
+    const row = addRow(label);
+    const slider = document.createElement("div");
+    slider.className = "range-slider";
+    const output = document.createElement("span");
+    output.className = "control-value";
+    const formatValue = format || ((val) => String(val));
+
+    noUiSlider.create(slider, {
+      start: values,
+      connect: true,
+      step,
+      range: { min, max },
+    });
+
+    slider.noUiSlider.on("update", (vals) => {
+      const low = Number(vals[0]);
+      const high = Number(vals[1]);
+      output.textContent = `${formatValue(low)} - ${formatValue(high)}`;
+    });
+
+    slider.noUiSlider.on("change", (vals) => {
+      const low = Number(vals[0]);
+      const high = Number(vals[1]);
+      onChange(low, high);
+    });
+
+    row.appendChild(slider);
+    row.appendChild(output);
+    return slider;
+  }
+
+  addRangeControl({
+    label: "Rows",
+    min: 1,
+    max: 10,
+    step: 1,
+    value: params.rows,
+    format: (val) => String(Math.round(val)),
+    onChange: (val) => {
+      params.rows = Math.max(1, Math.round(val));
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Cols",
+    min: 1,
+    max: 10,
+    step: 1,
+    value: params.cols,
+    format: (val) => String(Math.round(val)),
+    onChange: (val) => {
+      params.cols = Math.max(1, Math.round(val));
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Tile Size",
+    min: 0.6,
+    max: 1.5,
+    step: 0.02,
+    value: params.size,
+    format: (val) => val.toFixed(2),
+    onChange: (val) => {
+      params.size = val;
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Corner Radius",
+    min: 0.02,
+    max: 0.3,
+    step: 0.01,
+    value: params.cornerRadius,
+    format: (val) => val.toFixed(2),
+    onChange: (val) => {
+      params.cornerRadius = val;
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Wave Amp",
+    min: 0,
+    max: 0.16,
+    step: 0.005,
+    value: params.waveAmp,
+    format: (val) => val.toFixed(3),
+    onChange: (val) => {
+      params.waveAmp = val;
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Wave Freq",
+    min: 1,
+    max: 4,
+    step: 0.1,
+    value: params.waveFreq,
+    format: (val) => val.toFixed(1),
+    onChange: (val) => {
+      params.waveFreq = val;
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Tab Depth",
+    min: 0,
+    max: 0.2,
+    step: 0.005,
+    value: params.tabDepth,
+    format: (val) => val.toFixed(3),
+    onChange: (val) => {
+      params.tabDepth = val;
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Tab Width",
+    min: 0.15,
+    max: 0.7,
+    step: 0.01,
+    value: params.tabWidth,
+    format: (val) => val.toFixed(2),
+    onChange: (val) => {
+      params.tabWidth = val;
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Grout Gap",
+    min: 0,
+    max: 0.1,
+    step: 0.002,
+    value: params.groutGap,
+    format: (val) => val.toFixed(3),
+    onChange: (val) => {
+      params.groutGap = val;
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Height",
+    min: 0.02,
+    max: 0.2,
+    step: 0.005,
+    value: params.depth,
+    format: (val) => val.toFixed(3),
+    onChange: (val) => {
+      params.depth = val;
+      buildTiles();
+    },
+  });
+
+  addRangeControl({
+    label: "Seed",
+    min: 0,
+    max: 200,
+    step: 1,
+    value: params.seed,
+    format: (val) => String(Math.round(val)),
+    onChange: (val) => {
+      params.seed = Math.round(val);
+      buildTiles();
+    },
+  });
+
+  addDualSlider({
+    label: "Twist (deg)",
+    min: -25,
+    max: 25,
+    step: 0.5,
+    values: [params.twistMin, params.twistMax],
+    format: (val) => val.toFixed(1),
+    onChange: (low, high) => {
+      params.twistMin = Math.min(low, high);
+      params.twistMax = Math.max(low, high);
+      buildTiles();
+    },
+  });
+
+  addDualSlider({
+    label: "Scale",
+    min: 0.7,
+    max: 1.3,
+    step: 0.01,
+    values: [params.scaleMin, params.scaleMax],
+    format: (val) => val.toFixed(2),
+    onChange: (low, high) => {
+      params.scaleMin = Math.min(low, high);
+      params.scaleMax = Math.max(low, high);
+      buildTiles();
+    },
+  });
+
+  addColorControl({
+    label: "Tile Color",
+    value: params.tileColor,
+    onChange: (val) => {
+      params.tileColor = val;
+      tileMaterial.color.set(val);
+    },
+  });
+
+  addColorControl({
+    label: "Grout Color",
+    value: params.groutColor,
+    onChange: (val) => {
+      params.groutColor = val;
+      updateGrout();
+    },
+  });
+
+  document.body.appendChild(panel);
+}
+
+updateGrout();
+buildTiles();
+resize();
+createControlPanel();
 
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
   renderer.render(scene, camera);
 }
 
