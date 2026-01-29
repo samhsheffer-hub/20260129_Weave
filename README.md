@@ -1,12 +1,12 @@
-# 260128_Textures
+﻿# 20260129_Weave
 
-Procedural interlocking puzzle tiles rendered in Three.js with parametric controls for edge waviness, tabs, grout gaps, grid size, twist/scale gradients, height, and colors.
+Browser-based parametric 3D weave generator built with Three.js and lil-gui, offering warp/weft controls, color modes, lighting presets, and STL/OBJ export from a single merged mesh.
 
 ## Features
-- Rounded-square tiles with wavy concave/convex edges that interlock across a grid.
-- Gradient min/max controls for twist and scale across the tile field.
-- Tile and grout color pickers with adjustable grout gap and tile height.
-- Seeded randomness for repeatable variations.
+- Warp/weft thread generator with over-under offsets, twist modes, and symmetric tapering.
+- Color modes: single, two-color warp/weft, height gradient, and strand gradient via vertex colors.
+- Lighting presets plus a fading infinite-style ground grid.
+- STL and OBJ export of the current parametric state.
 
 ## Getting Started
 1. Install dependencies: `npm install`
@@ -14,7 +14,9 @@ Procedural interlocking puzzle tiles rendered in Three.js with parametric contro
 3. Open the local URL shown in the terminal.
 
 ## Controls
-- **Rows/Cols:** set grid size.
-- **Wave/Tab:** tune edge waviness and tab shape.
-- **Twist/Scale:** set min/max gradients across the grid.
-- **Height/Grout/Colors:** adjust tile thickness, spacing, and palette.
+- **Threads:** thread counts, radius, spacing, weave height, and resolution.
+- **Twist + Taper:** twist amount/mode and symmetric taper controls.
+- **Layout:** weave angle rotation.
+- **Color:** color mode and gradient endpoints.
+- **Lighting:** switch between five preset rigs.
+- **Export:** download STL or OBJ for the current mesh.

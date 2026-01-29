@@ -1,20 +1,25 @@
 {
-  "name": "260128-twisted-tower-02",
+  "name": "20260129-weave",
   "version": "0.1.0",
-  "description": "Parametric twisted tower generator with stacked floor slabs.",
+  "description": "Parametric 3D weave structure generator with export controls.",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "node server/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
     "lil-gui": "^0.20.0",
     "nouislider": "^15.8.1",
+    "openai": "^5.12.0",
+    "p5": "^1.9.4",
     "three": "^0.160.0"
   },
   "devDependencies": {
