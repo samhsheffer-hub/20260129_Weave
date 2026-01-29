@@ -73,7 +73,7 @@ function buildThreadCurve(points, params) {
     false
   );
   applyTaperToTube(tube, params);
-  return tube;
+  return tube.toNonIndexed();
 }
 
 export function generateWeaveGeometries(params) {
@@ -140,3 +140,4 @@ export function generateWeaveGeometries(params) {
 
   return strands;
 }
+

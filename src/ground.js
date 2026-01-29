@@ -1,16 +1,22 @@
 ﻿import * as THREE from "three";
 
-export function createGroundGrid() {
+export function createGroundGrid(options = {}) {
   const size = 200;
   const geometry = new THREE.PlaneGeometry(size, size, 1, 1);
   geometry.rotateX(-Math.PI / 2);
 
+  const baseColor = options.baseColor ?? "#0b0d10";
+  const gridColor = options.gridColor ?? "#9aa4b5";
+
   const material = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
+    extensions: {
+      derivatives: true,
+    },
     uniforms: {
-      gridColor: { value: new THREE.Color("#9aa4b5") },
-      baseColor: { value: new THREE.Color("#0b0d10") },
+      gridColor: { value: new THREE.Color(gridColor) },
+      baseColor: { value: new THREE.Color(baseColor) },
       gridScale: { value: 1.0 },
       majorScale: { value: 5.0 },
       fadeFactor: { value: 0.03 },
