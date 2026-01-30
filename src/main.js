@@ -9,8 +9,15 @@ import { applyLightingPreset, LIGHTING_PRESETS } from "./lighting.js";
 import { exportOBJ, exportSTL } from "./exporters.js";
 import "./style.css";
 
+const STORAGE_KEY = "weaveBackground";
+const storedBackground =
+  typeof window !== "undefined"
+    ? window.localStorage.getItem(STORAGE_KEY)
+    : null;
+const initialBackground = storedBackground || "#0b0d10";
+
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#0b0d10");
+scene.background = new THREE.Color(initialBackground);
 
 const camera = new THREE.PerspectiveCamera(
   45,
@@ -32,7 +39,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 
-const grid = createGroundGrid();
+const grid = createGroundGrid({ baseColor: initialBackground });
 scene.add(grid);
 
 let weaveMesh = null;
@@ -41,6 +48,14 @@ let weaveMaterial = null;
 const params = {
   threadCountU: 12,
   threadCountV: 12,
+  warpShape: "tube",
+  weftShape: "tube",
+  warpWidth: 0.24,
+  warpHeight: 0.24,
+  weftWidth: 0.24,
+  weftHeight: 0.24,
+  warpWall: 0.03,
+  weftWall: 0.03,
   radiusStart: 0.1,
   radiusMid: 0.12,
   radiusEnd: 0.1,
@@ -62,16 +77,28 @@ const params = {
   twistCustom2: 0.5,
   twistCustom3: 0,
   weaveAngle: 15,
-  resolution: 60,
+  resolution: 80,
   colorMode: "twoColor",
   primaryColor: "#f5f5f2",
   secondaryColor: "#ff8f6b",
   gradientStart: "#53e3ff",
   gradientEnd: "#f38bff",
   lightingPreset: "Studio Soft",
+  backgroundColor: initialBackground,
   exportSTL: () => exportSTL(weaveMesh, "weave"),
   exportOBJ: () => exportOBJ(weaveMesh, "weave"),
 };
+
+function applyBackground(color) {
+  const next = new THREE.Color(color);
+  scene.background = next;
+  if (grid.material?.uniforms?.baseColor) {
+    grid.material.uniforms.baseColor.value.set(next);
+  }
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(STORAGE_KEY, color);
+  }
+}
 
 function rebuildWeave() {
   if (weaveMesh) {
@@ -111,6 +138,7 @@ function applyLighting() {
 }
 
 applyLighting();
+applyBackground(params.backgroundColor);
 rebuildWeave();
 
 const gui = new GUI({ title: "Weave Controls" });
@@ -120,6 +148,20 @@ weaveFolder.add(params, "threadCountV", 2, 40, 1).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "spacing", 0.25, 1.5, 0.01).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "weaveHeight", 0, 0.8, 0.01).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "resolution", 12, 140, 1).onFinishChange(rebuildWeave);
+
+const shapeFolder = gui.addFolder("Shape");
+shapeFolder
+  .add(params, "warpShape", ["tube", "pipe", "square", "rect"])
+  .onFinishChange(rebuildWeave);
+shapeFolder
+  .add(params, "weftShape", ["tube", "pipe", "square", "rect"])
+  .onFinishChange(rebuildWeave);
+shapeFolder.add(params, "warpWidth", 0.05, 1.0, 0.01).onFinishChange(rebuildWeave);
+shapeFolder.add(params, "warpHeight", 0.05, 1.0, 0.01).onFinishChange(rebuildWeave);
+shapeFolder.add(params, "weftWidth", 0.05, 1.0, 0.01).onFinishChange(rebuildWeave);
+shapeFolder.add(params, "weftHeight", 0.05, 1.0, 0.01).onFinishChange(rebuildWeave);
+shapeFolder.add(params, "warpWall", 0.005, 0.2, 0.005).onFinishChange(rebuildWeave);
+shapeFolder.add(params, "weftWall", 0.005, 0.2, 0.005).onFinishChange(rebuildWeave);
 
 const profileFolder = gui.addFolder("Thickness");
 profileFolder.add(params, "radiusStart", 0.02, 0.4, 0.01).onFinishChange(rebuildWeave);
@@ -180,6 +222,11 @@ lightingFolder
   .add(params, "lightingPreset", LIGHTING_PRESETS)
   .onChange(applyLighting);
 
+const backgroundFolder = gui.addFolder("Background");
+backgroundFolder.addColor(params, "backgroundColor").onChange((value) => {
+  applyBackground(value);
+});
+
 const exportFolder = gui.addFolder("Export");
 exportFolder.add(params, "exportSTL");
 exportFolder.add(params, "exportOBJ");
@@ -196,3 +243,4 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+

@@ -77,8 +77,86 @@ function applyRadiusProfile(geometry, params, baseRadius) {
   geometry.computeVertexNormals();
 }
 
-function createCapGeometry(center, normal, radius, radialSegments) {
-  const geometry = new THREE.CircleGeometry(radius, radialSegments);
+function makeRectShape(width, height) {
+  const shape = new THREE.Shape();
+  const halfW = width * 0.5;
+  const halfH = height * 0.5;
+  shape.moveTo(-halfW, -halfH);
+  shape.lineTo(halfW, -halfH);
+  shape.lineTo(halfW, halfH);
+  shape.lineTo(-halfW, halfH);
+  shape.lineTo(-halfW, -halfH);
+  return shape;
+}
+
+function getShapeConfig(params, isWarp) {
+  const shapeType = isWarp ? params.warpShape : params.weftShape;
+  const widthRaw = isWarp ? params.warpWidth : params.weftWidth;
+  const heightRaw = isWarp ? params.warpHeight : params.weftHeight;
+  const wallRaw = isWarp ? params.warpWall : params.weftWall;
+
+  const width = Math.max(0.001, widthRaw || params.radiusMid * 2);
+  const height = Math.max(0.001, heightRaw || params.radiusMid * 2);
+  const wall = Math.max(0.001, wallRaw || 0.02);
+
+  if (shapeType === "square") {
+    const size = Math.max(width, height);
+    return {
+      shape: makeRectShape(size, size),
+      baseRadius: size * 0.5,
+      segments: 4,
+    };
+  }
+
+  if (shapeType === "rect") {
+    return {
+      shape: makeRectShape(width, height),
+      baseRadius: Math.max(width, height) * 0.5,
+      segments: 4,
+    };
+  }
+
+  const outer = Math.max(width, height) * 0.5;
+  const circle = new THREE.Shape();
+  circle.absarc(0, 0, outer, 0, Math.PI * 2, false);
+
+  if (shapeType === "pipe") {
+    const innerRadius = Math.max(0.001, outer - wall);
+    const hole = new THREE.Path();
+    hole.absarc(0, 0, Math.min(innerRadius, outer * 0.95), 0, Math.PI * 2, true);
+    circle.holes.push(hole);
+  }
+
+  return {
+    shape: circle,
+    baseRadius: outer,
+    segments: 32,
+  };
+}
+
+function stripCaps(geometry) {
+  if (!geometry.index || !geometry.groups || geometry.groups.length === 0) {
+    return geometry;
+  }
+  const sideGroup = geometry.groups[0];
+  if (!sideGroup || sideGroup.count <= 0) return geometry;
+
+  const indexArray = geometry.index.array;
+  const sliced = indexArray.slice(
+    sideGroup.start,
+    sideGroup.start + sideGroup.count
+  );
+
+  const trimmed = geometry.clone();
+  trimmed.setIndex(new THREE.BufferAttribute(sliced, 1));
+  trimmed.clearGroups();
+  trimmed.addGroup(0, sliced.length, 0);
+  return trimmed;
+}
+
+function createCapFromShape(shape, center, normal, scale) {
+  const geometry = new THREE.ShapeGeometry(shape, 24);
+  geometry.scale(scale, scale, scale);
   const up = new THREE.Vector3(0, 0, 1);
   const target = normal.clone().normalize();
   const quaternion = new THREE.Quaternion().setFromUnitVectors(up, target);
@@ -88,42 +166,159 @@ function createCapGeometry(center, normal, radius, radialSegments) {
   return geometry;
 }
 
-function buildThreadCurve(points, params) {
-  const curve = new THREE.CatmullRomCurve3(points);
-  const tubularSegments = Math.max(12, params.resolution * 2);
-  const radialSegments = 12;
-  const baseRadius = Math.max(0.001, params.radiusMid);
-  const tube = new THREE.TubeGeometry(
-    curve,
-    tubularSegments,
-    baseRadius,
-    radialSegments,
-    false
-  );
+function cleanupGeometry(geometry, areaEps, maxCoord) {
+  const src = geometry.toNonIndexed();
+  const position = src.attributes.position;
+  const normal = src.attributes.normal;
+  const uv = src.attributes.uv;
 
-  applyRadiusProfile(tube, params, baseRadius);
+  const posArray = position.array;
+  const normArray = normal ? normal.array : null;
+  const uvArray = uv ? uv.array : null;
 
+  const outPos = [];
+  const outNorm = [];
+  const outUv = [];
+
+  const maxCoordAbs = maxCoord ?? 1e4;
+
+  for (let i = 0; i < posArray.length; i += 9) {
+    const ax = posArray[i];
+    const ay = posArray[i + 1];
+    const az = posArray[i + 2];
+    const bx = posArray[i + 3];
+    const by = posArray[i + 4];
+    const bz = posArray[i + 5];
+    const cx = posArray[i + 6];
+    const cy = posArray[i + 7];
+    const cz = posArray[i + 8];
+
+    if (
+      !Number.isFinite(ax) ||
+      !Number.isFinite(ay) ||
+      !Number.isFinite(az) ||
+      !Number.isFinite(bx) ||
+      !Number.isFinite(by) ||
+      !Number.isFinite(bz) ||
+      !Number.isFinite(cx) ||
+      !Number.isFinite(cy) ||
+      !Number.isFinite(cz)
+    ) {
+      continue;
+    }
+
+    if (
+      Math.abs(ax) > maxCoordAbs ||
+      Math.abs(ay) > maxCoordAbs ||
+      Math.abs(az) > maxCoordAbs ||
+      Math.abs(bx) > maxCoordAbs ||
+      Math.abs(by) > maxCoordAbs ||
+      Math.abs(bz) > maxCoordAbs ||
+      Math.abs(cx) > maxCoordAbs ||
+      Math.abs(cy) > maxCoordAbs ||
+      Math.abs(cz) > maxCoordAbs
+    ) {
+      continue;
+    }
+
+    const abx = bx - ax;
+    const aby = by - ay;
+    const abz = bz - az;
+    const acx = cx - ax;
+    const acy = cy - ay;
+    const acz = cz - az;
+
+    const crossX = aby * acz - abz * acy;
+    const crossY = abz * acx - abx * acz;
+    const crossZ = abx * acy - aby * acx;
+
+    const area = 0.5 * Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
+    if (area < areaEps) {
+      continue;
+    }
+
+    outPos.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+
+    if (normArray) {
+      outNorm.push(
+        normArray[i],
+        normArray[i + 1],
+        normArray[i + 2],
+        normArray[i + 3],
+        normArray[i + 4],
+        normArray[i + 5],
+        normArray[i + 6],
+        normArray[i + 7],
+        normArray[i + 8]
+      );
+    }
+
+    if (uvArray) {
+      const uvIndex = (i / 3) * 2;
+      outUv.push(
+        uvArray[uvIndex],
+        uvArray[uvIndex + 1],
+        uvArray[uvIndex + 2],
+        uvArray[uvIndex + 3],
+        uvArray[uvIndex + 4],
+        uvArray[uvIndex + 5]
+      );
+    }
+  }
+
+  const cleaned = new THREE.BufferGeometry();
+  cleaned.setAttribute("position", new THREE.Float32BufferAttribute(outPos, 3));
+  if (normArray) {
+    cleaned.setAttribute("normal", new THREE.Float32BufferAttribute(outNorm, 3));
+  }
+  if (uvArray) {
+    cleaned.setAttribute("uv", new THREE.Float32BufferAttribute(outUv, 2));
+  }
+  cleaned.computeVertexNormals();
+  return cleaned;
+}
+
+function buildThreadCurve(points, params, shapeConfig) {
+  const curve = new THREE.CatmullRomCurve3(points, false, "centripetal", 0.5);
+  const tubularSegments = Math.max(24, params.resolution * 3);
+  const geometry = new THREE.ExtrudeGeometry(shapeConfig.shape, {
+    steps: tubularSegments,
+    bevelEnabled: false,
+    extrudePath: curve,
+    curveSegments: shapeConfig.segments,
+  });
+
+  applyRadiusProfile(geometry, params, shapeConfig.baseRadius);
+
+  const sideOnly = stripCaps(geometry);
   const start = curve.getPoint(0);
   const end = curve.getPoint(1);
   const startTangent = curve.getTangent(0).normalize();
   const endTangent = curve.getTangent(1).normalize();
-  const radiusStart = getRadiusAt(0, params);
-  const radiusEnd = getRadiusAt(1, params);
 
-  const capStart = createCapGeometry(
+  const scaleStart = getRadiusAt(0, params) / shapeConfig.baseRadius;
+  const scaleEnd = getRadiusAt(1, params) / shapeConfig.baseRadius;
+
+  const capStart = createCapFromShape(
+    shapeConfig.shape,
     start,
     startTangent.clone().negate(),
-    radiusStart,
-    radialSegments
+    scaleStart
   );
-  const capEnd = createCapGeometry(end, endTangent, radiusEnd, radialSegments);
+  const capEnd = createCapFromShape(
+    shapeConfig.shape,
+    end,
+    endTangent,
+    scaleEnd
+  );
 
-  const merged = mergeGeometries([tube, capStart, capEnd], false);
-  if (!merged) {
-    return tube.toNonIndexed();
-  }
-  merged.computeVertexNormals();
-  return merged.toNonIndexed();
+  const combined = [sideOnly, capStart, capEnd].map((g) => g.toNonIndexed());
+  const mergedGeometry = mergeGeometries(combined, false);
+  return cleanupGeometry(
+    mergedGeometry,
+    Math.max(1e-8, shapeConfig.baseRadius * shapeConfig.baseRadius * 5e-4),
+    1e3
+  );
 }
 
 function hash(value) {
@@ -240,12 +435,15 @@ export function generateWeaveGeometries(params) {
   let strandIndex = 0;
   const totalStrands = totalU + totalV;
 
+  const warpShape = getShapeConfig(params, true);
+  const weftShape = getShapeConfig(params, false);
+
   for (let i = 0; i < totalU; i++) {
     const points = [];
     const y = -halfU + i * spacing;
     for (let s = 0; s <= params.resolution; s++) {
       const t = s / params.resolution;
-      const x = THREE.MathUtils.lerp(-halfV, halfV, t);
+      const x = lerp(-halfV, halfV, t);
       const cross = (x + halfV) / spacing;
       const baseIndex = Math.floor(cross);
       const frac = cross - baseIndex;
@@ -266,7 +464,7 @@ export function generateWeaveGeometries(params) {
     }
 
     const relaxed = relaxPoints(points, params);
-    const geometry = buildThreadCurve(relaxed, params);
+    const geometry = buildThreadCurve(relaxed, params, warpShape);
     geometry.userData = { strandIndex, totalStrands, isWarp: true };
     strands.push({ geometry, strandIndex, totalStrands, isWarp: true });
     strandIndex += 1;
@@ -277,7 +475,7 @@ export function generateWeaveGeometries(params) {
     const x = -halfV + j * spacing;
     for (let s = 0; s <= params.resolution; s++) {
       const t = s / params.resolution;
-      const y = THREE.MathUtils.lerp(-halfU, halfU, t);
+      const y = lerp(-halfU, halfU, t);
       const cross = (y + halfU) / spacing;
       const baseIndex = Math.floor(cross);
       const frac = cross - baseIndex;
@@ -298,7 +496,7 @@ export function generateWeaveGeometries(params) {
     }
 
     const relaxed = relaxPoints(points, params);
-    const geometry = buildThreadCurve(relaxed, params);
+    const geometry = buildThreadCurve(relaxed, params, weftShape);
     geometry.userData = { strandIndex, totalStrands, isWarp: false };
     strands.push({ geometry, strandIndex, totalStrands, isWarp: false });
     strandIndex += 1;
