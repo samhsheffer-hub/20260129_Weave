@@ -10,6 +10,7 @@ Browser-based parametric 3D weave generator built with Three.js and lil-gui, off
 - Independent warp/weft cross-section shapes: tube/pipe/square/rect with size controls.
 - Color modes: single, two-color warp/weft, height gradient, and strand gradient via vertex colors.
 - Lighting presets plus a fading infinite-style ground grid.
+- Background color control.
 - STL and OBJ export of the current parametric state.
 
 ## Getting Started
