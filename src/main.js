@@ -48,36 +48,16 @@ let weaveMaterial = null;
 const params = {
   threadCountU: 12,
   threadCountV: 12,
-  warpShape: "tube",
-  weftShape: "tube",
-  warpWidth: 0.24,
-  warpHeight: 0.24,
-  weftWidth: 0.24,
-  weftHeight: 0.24,
-  warpWall: 0.03,
-  weftWall: 0.03,
-  radiusStart: 0.1,
-  radiusMid: 0.12,
-  radiusEnd: 0.1,
-  profileCurve: "ease",
+  threadRadius: 0.12,
   spacing: 0.6,
   weaveHeight: 0.28,
-  heightLevels: 3,
-  contactOffset: 0.06,
-  contactSmoothness: 0.2,
   collisionPadding: 0,
-  stiffness: 0.7,
-  bendResistance: 0.6,
-  relaxIterations: 18,
   twistAmount: 120,
-  twistProfile: "ease",
-  twistNoise: 6,
-  twistCustom0: 0,
-  twistCustom1: 0.5,
-  twistCustom2: 0.5,
-  twistCustom3: 0,
+  twistMode: "startToEnd",
+  scaleTaper: 0.35,
+  scaleMode: "symmetrical",
   weaveAngle: 15,
-  resolution: 80,
+  resolution: 60,
   colorMode: "twoColor",
   primaryColor: "#f5f5f2",
   secondaryColor: "#ff8f6b",
@@ -88,17 +68,6 @@ const params = {
   exportSTL: () => exportSTL(weaveMesh, "weave"),
   exportOBJ: () => exportOBJ(weaveMesh, "weave"),
 };
-
-function applyBackground(color) {
-  const next = new THREE.Color(color);
-  scene.background = next;
-  if (grid.material?.uniforms?.baseColor) {
-    grid.material.uniforms.baseColor.value.set(next);
-  }
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(STORAGE_KEY, color);
-  }
-}
 
 function rebuildWeave() {
   if (weaveMesh) {
@@ -137,6 +106,17 @@ function applyLighting() {
   applyLightingPreset(scene, params.lightingPreset);
 }
 
+function applyBackground(color) {
+  const next = new THREE.Color(color);
+  scene.background = next;
+  if (grid.material?.uniforms?.baseColor) {
+    grid.material.uniforms.baseColor.value.set(next);
+  }
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(STORAGE_KEY, color);
+  }
+}
+
 applyLighting();
 applyBackground(params.backgroundColor);
 rebuildWeave();
@@ -145,60 +125,24 @@ const gui = new GUI({ title: "Weave Controls" });
 const weaveFolder = gui.addFolder("Threads");
 weaveFolder.add(params, "threadCountU", 2, 40, 1).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "threadCountV", 2, 40, 1).onFinishChange(rebuildWeave);
+weaveFolder.add(params, "threadRadius", 0.04, 0.4, 0.01).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "spacing", 0.25, 1.5, 0.01).onFinishChange(rebuildWeave);
 weaveFolder.add(params, "weaveHeight", 0, 0.8, 0.01).onFinishChange(rebuildWeave);
+weaveFolder
+  .add(params, "collisionPadding", 0, 0.3, 0.01)
+  .name("collisionClearance")
+  .onFinishChange(rebuildWeave);
 weaveFolder.add(params, "resolution", 12, 140, 1).onFinishChange(rebuildWeave);
 
-const shapeFolder = gui.addFolder("Shape");
-shapeFolder
-  .add(params, "warpShape", ["tube", "pipe", "square", "rect"])
-  .onFinishChange(rebuildWeave);
-shapeFolder
-  .add(params, "weftShape", ["tube", "pipe", "square", "rect"])
-  .onFinishChange(rebuildWeave);
-shapeFolder.add(params, "warpWidth", 0.05, 1.0, 0.01).onFinishChange(rebuildWeave);
-shapeFolder.add(params, "warpHeight", 0.05, 1.0, 0.01).onFinishChange(rebuildWeave);
-shapeFolder.add(params, "weftWidth", 0.05, 1.0, 0.01).onFinishChange(rebuildWeave);
-shapeFolder.add(params, "weftHeight", 0.05, 1.0, 0.01).onFinishChange(rebuildWeave);
-shapeFolder.add(params, "warpWall", 0.005, 0.2, 0.005).onFinishChange(rebuildWeave);
-shapeFolder.add(params, "weftWall", 0.005, 0.2, 0.005).onFinishChange(rebuildWeave);
-
-const profileFolder = gui.addFolder("Thickness");
-profileFolder.add(params, "radiusStart", 0.02, 0.4, 0.01).onFinishChange(rebuildWeave);
-profileFolder.add(params, "radiusMid", 0.02, 0.5, 0.01).onFinishChange(rebuildWeave);
-profileFolder.add(params, "radiusEnd", 0.02, 0.4, 0.01).onFinishChange(rebuildWeave);
-profileFolder
-  .add(params, "profileCurve", ["linear", "ease", "sharp"])
-  .onFinishChange(rebuildWeave);
-
-const crossingFolder = gui.addFolder("Crossings");
-crossingFolder.add(params, "heightLevels", 2, 6, 1).onFinishChange(rebuildWeave);
-crossingFolder.add(params, "contactOffset", 0, 0.3, 0.01).onFinishChange(rebuildWeave);
-crossingFolder
-  .add(params, "contactSmoothness", 0.05, 0.6, 0.01)
-  .onFinishChange(rebuildWeave);
-crossingFolder
-  .add(params, "collisionPadding", 0, 0.3, 0.01)
-  .onFinishChange(rebuildWeave);
-
-const relaxFolder = gui.addFolder("Relaxation");
-relaxFolder.add(params, "stiffness", 0, 1, 0.01).onFinishChange(rebuildWeave);
-relaxFolder
-  .add(params, "bendResistance", 0, 1, 0.01)
-  .onFinishChange(rebuildWeave);
-relaxFolder.add(params, "relaxIterations", 0, 60, 1).onFinishChange(rebuildWeave);
-
-const twistFolder = gui.addFolder("Twist");
+const twistFolder = gui.addFolder("Twist + Taper");
 twistFolder.add(params, "twistAmount", -360, 360, 1).onFinishChange(rebuildWeave);
 twistFolder
-  .add(params, "twistProfile", ["linear", "ease", "symmetric", "custom"])
+  .add(params, "twistMode", ["startToEnd", "symmetrical"])
   .onFinishChange(rebuildWeave);
-twistFolder.add(params, "twistNoise", 0, 20, 0.5).onFinishChange(rebuildWeave);
-const customTwistFolder = twistFolder.addFolder("Custom Graph");
-customTwistFolder.add(params, "twistCustom0", 0, 1, 0.01).onFinishChange(rebuildWeave);
-customTwistFolder.add(params, "twistCustom1", 0, 1, 0.01).onFinishChange(rebuildWeave);
-customTwistFolder.add(params, "twistCustom2", 0, 1, 0.01).onFinishChange(rebuildWeave);
-customTwistFolder.add(params, "twistCustom3", 0, 1, 0.01).onFinishChange(rebuildWeave);
+twistFolder.add(params, "scaleTaper", 0, 0.9, 0.01).onFinishChange(rebuildWeave);
+twistFolder
+  .add(params, "scaleMode", ["symmetrical", "startToEnd"])
+  .onFinishChange(rebuildWeave);
 
 const layoutFolder = gui.addFolder("Layout");
 layoutFolder.add(params, "weaveAngle", -180, 180, 1).onFinishChange(rebuildWeave);
@@ -223,9 +167,11 @@ lightingFolder
   .onChange(applyLighting);
 
 const backgroundFolder = gui.addFolder("Background");
-backgroundFolder.addColor(params, "backgroundColor").onChange((value) => {
-  applyBackground(value);
-});
+backgroundFolder
+  .addColor(params, "backgroundColor")
+  .onChange((value) => {
+    applyBackground(value);
+  });
 
 const exportFolder = gui.addFolder("Export");
 exportFolder.add(params, "exportSTL");
@@ -243,4 +189,3 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
